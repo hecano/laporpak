@@ -1,0 +1,341 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSignedInVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedInVerified() && request.auth.uid == uid;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedInVerified() && request.auth.token.email == 'sesere96@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isSignedInVerified() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isStaff() {
+      return isAdmin() || (
+        isSignedInVerified() &&
+        exists(/databases/$(database)/documents/staff_grants/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'unitSkpd', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'email', 'role', 'unitSkpd', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 120 &&
+        data.role in ['kepala_seksi', 'teknisi', 'pelapor_skpd'] &&
+        data.unitSkpd is string && data.unitSkpd.size() >= 2 && data.unitSkpd.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminGrant(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 120 &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 && data.grantedBy.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidStaffGrant(data) {
+      return data.keys().hasAll(['uid', 'role', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'grantedBy', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.role in ['kepala_seksi', 'teknisi'] &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 && data.grantedBy.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidTechnician(data) {
+      return data.keys().hasAll(['name', 'nip', 'jabatan', 'spesialisasi', 'statusAktif', 'linkedUid', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'nip', 'jabatan', 'spesialisasi', 'statusAktif', 'linkedUid', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+        data.nip is string && data.nip.size() >= 3 && data.nip.size() <= 35 &&
+        data.jabatan is string && data.jabatan.size() >= 2 && data.jabatan.size() <= 100 &&
+        data.spesialisasi in ['Jaringan & Fiber Optik', 'Server & Data Center', 'Keamanan & Firewall', 'Wireless & Akses Publik'] &&
+        data.statusAktif in ['aktif', 'lapangan', 'cuti'] &&
+        data.linkedUid is string && data.linkedUid.size() <= 128 &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 && data.createdBy.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBoundedStringList(arr) {
+      return arr is list && arr.size() <= 10 && (arr.size() == 0 || arr[0] is string);
+    }
+
+    function isValidTicket(data) {
+      return data.keys().hasAll([
+          'ticketNumber', 'title', 'description', 'skpdName', 'skpdPicName', 'skpdContact',
+          'category', 'priority', 'status', 'reporterUid',
+          'assignedTechId', 'assignedTechName', 'assignedTechUid', 'assignedByUid',
+          'rootCause', 'resolutionNotes',
+          'slaResponseTargetMinutes', 'slaResolutionTargetMinutes',
+          'reportedAtMs', 'assignedAtMs', 'respondedAtMs', 'resolvedAtMs',
+          'responseMinutes', 'resolutionMinutes', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ticketNumber', 'title', 'description', 'skpdName', 'skpdPicName', 'skpdContact',
+          'category', 'priority', 'status', 'reporterUid',
+          'assignedTechId', 'assignedTechName', 'assignedTechUid',
+          'assignedTechIds', 'assignedTechNames', 'assignedTechUids',
+          'assignedByUid', 'holdReason', 'rootCause', 'resolutionNotes',
+          'slaResponseTargetMinutes', 'slaResolutionTargetMinutes',
+          'reportedAtMs', 'assignedAtMs', 'respondedAtMs', 'resolvedAtMs',
+          'responseMinutes', 'resolutionMinutes', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ticketNumber is string && data.ticketNumber.size() >= 10 && data.ticketNumber.size() <= 24 && data.ticketNumber.matches('^TIK-[0-9]{4}-[0-9]{4}$') &&
+        data.title is string && data.title.size() >= 5 && data.title.size() <= 160 &&
+        data.description is string && data.description.size() >= 5 && data.description.size() <= 2000 &&
+        data.skpdName is string && data.skpdName.size() >= 2 && data.skpdName.size() <= 120 &&
+        data.skpdPicName is string && data.skpdPicName.size() >= 2 && data.skpdPicName.size() <= 100 &&
+        data.skpdContact is string && data.skpdContact.size() >= 3 && data.skpdContact.size() <= 60 &&
+        data.category in ['Jaringan LAN/WAN', 'Server & Hosting', 'Internet & Bandwidth', 'VPN & Interkoneksi', 'Keamanan Jaringan', 'Perangkat Router/Switch'] &&
+        data.priority in ['Kritis', 'Tinggi', 'Sedang', 'Rendah'] &&
+        data.status in ['Baru', 'Ditugaskan', 'Ditangani', 'On Hold', 'Selesai'] &&
+        data.reporterUid is string && data.reporterUid.size() >= 1 && data.reporterUid.size() <= 128 && data.reporterUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.assignedTechId is string && data.assignedTechId.size() <= 128 &&
+        data.assignedTechName is string && data.assignedTechName.size() <= 250 &&
+        data.assignedTechUid is string && data.assignedTechUid.size() <= 128 &&
+        (!('assignedTechIds' in data) || isValidBoundedStringList(data.assignedTechIds)) &&
+        (!('assignedTechNames' in data) || isValidBoundedStringList(data.assignedTechNames)) &&
+        (!('assignedTechUids' in data) || isValidBoundedStringList(data.assignedTechUids)) &&
+        data.assignedByUid is string && data.assignedByUid.size() <= 128 &&
+        (!('holdReason' in data) || (data.holdReason is string && data.holdReason.size() <= 500)) &&
+        data.rootCause is string && data.rootCause.size() <= 500 &&
+        data.resolutionNotes is string && data.resolutionNotes.size() <= 2000 &&
+        data.slaResponseTargetMinutes is number && data.slaResponseTargetMinutes > 0 && data.slaResponseTargetMinutes <= 10080 &&
+        data.slaResolutionTargetMinutes is number && data.slaResolutionTargetMinutes > 0 && data.slaResolutionTargetMinutes <= 43200 &&
+        data.reportedAtMs is number && data.reportedAtMs > 0 &&
+        data.assignedAtMs is number && data.assignedAtMs >= 0 &&
+        data.respondedAtMs is number && data.respondedAtMs >= 0 &&
+        data.resolvedAtMs is number && data.resolvedAtMs >= 0 &&
+        data.responseMinutes is number && data.responseMinutes >= 0 &&
+        data.resolutionMinutes is number && data.resolutionMinutes >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTicketLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorName', 'action', 'note', 'fromStatus', 'toStatus', 'createdAt']) &&
+        data.keys().hasOnly(['actorUid', 'actorName', 'action', 'note', 'fromStatus', 'toStatus', 'createdAt']) &&
+        data.actorUid is string && data.actorUid.size() >= 1 && data.actorUid.size() <= 128 && data.actorUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 100 &&
+        data.action is string && data.action.size() >= 2 && data.action.size() <= 100 &&
+        data.note is string && data.note.size() <= 1000 &&
+        data.fromStatus in ['', 'Baru', 'Ditugaskan', 'Ditangani', 'On Hold', 'Selesai'] &&
+        data.toStatus in ['Baru', 'Ditugaskan', 'Ditangani', 'On Hold', 'Selesai'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isAssignedTechOnTicket(data) {
+      return data.assignedTechUid == request.auth.uid ||
+        ('assignedTechUids' in data && request.auth.uid in data.assignedTechUids);
+    }
+
+    // --- Collection Rules ---
+
+    // 1. User Profiles (Strict PII Isolation)
+    match /users/{userId} {
+      allow get: if isSignedInVerified() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedInVerified() && (isBootstrappedAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isSignedInVerified() && isValidId(userId) && userId == request.auth.uid &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().email == request.auth.token.email &&
+        (incoming().role == 'pelapor_skpd' || isBootstrappedAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedInVerified() && isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'unitSkpd', 'displayName', 'updatedAt'])) ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'unitSkpd', 'updatedAt']))
+        );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // 2. Admin Grants (Kepala Seksi Authority)
+    match /admins/{adminId} {
+      allow get: if isSignedInVerified() && isValidId(adminId) && (request.auth.uid == adminId || isBootstrappedAdmin());
+      allow list: if isBootstrappedAdmin() && resource.data.uid is string;
+      allow create: if isBootstrappedAdmin() && isValidId(adminId) &&
+        isValidAdminGrant(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().grantedBy == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    // 3. Staff Grants (Teknisi & Kepala Seksi Ticket List Access)
+    match /staff_grants/{uid} {
+      allow get: if isSignedInVerified() && isValidId(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin() && resource.data.uid is string;
+      allow create, update: if isAdmin() && isValidId(uid) &&
+        isValidStaffGrant(incoming()) &&
+        incoming().uid == uid &&
+        incoming().grantedBy == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow delete: if isAdmin() && isValidId(uid);
+    }
+
+    // 4. Technicians Directory (Pegawai Seksi Infrastruktur & Jaringan)
+    match /technicians/{techId} {
+      allow get: if isSignedInVerified() && isValidId(techId) && (isStaff() || existing().linkedUid == request.auth.uid);
+      allow list: if isSignedInVerified() && (
+        isBootstrappedAdmin() ||
+        resource.data.linkedUid == request.auth.uid ||
+        resource.data.statusAktif in ['aktif', 'lapangan', 'cuti'] && isStaff()
+      );
+      allow create: if isAdmin() && isValidId(techId) &&
+        isValidTechnician(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(techId) &&
+        isValidTechnician(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nip', 'jabatan', 'spesialisasi', 'statusAktif', 'linkedUid', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(techId);
+    }
+
+    // 5. Tickets (Pelaporan Gangguan Jaringan & Server)
+    match /tickets/{ticketId} {
+      allow get: if isSignedInVerified() && isValidId(ticketId) && (
+        isStaff() ||
+        existing().reporterUid == request.auth.uid ||
+        isAssignedTechOnTicket(existing())
+      );
+      allow list: if isSignedInVerified() && (
+        isBootstrappedAdmin() ||
+        resource.data.reporterUid == request.auth.uid ||
+        isAssignedTechOnTicket(resource.data) ||
+        (resource.data.ticketNumber is string && isStaff())
+      );
+      allow create: if isSignedInVerified() && isValidId(ticketId) &&
+        isValidTicket(incoming()) &&
+        incoming().keys().hasAll(['assignedTechIds', 'assignedTechNames', 'assignedTechUids', 'holdReason']) &&
+        incoming().reporterUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isAdmin() || (
+            incoming().status == 'Baru' &&
+            incoming().assignedTechId == '' &&
+            incoming().assignedTechName == '' &&
+            incoming().assignedTechUid == '' &&
+            incoming().assignedTechIds.size() == 0 &&
+            incoming().assignedTechNames.size() == 0 &&
+            incoming().assignedTechUids.size() == 0 &&
+            incoming().assignedByUid == '' &&
+            incoming().holdReason == '' &&
+            incoming().assignedAtMs == 0 &&
+            incoming().respondedAtMs == 0 &&
+            incoming().resolvedAtMs == 0 &&
+            incoming().responseMinutes == 0 &&
+            incoming().resolutionMinutes == 0
+          )
+        );
+      allow update: if isSignedInVerified() && isValidId(ticketId) &&
+        isValidTicket(incoming()) &&
+        incoming().ticketNumber == existing().ticketNumber &&
+        incoming().reporterUid == existing().reporterUid &&
+        incoming().reportedAtMs == existing().reportedAtMs &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action A: Kepala Seksi (Admin) full multi-tech dispatch, status, On Hold & SLA management
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'status', 'priority', 'category', 'assignedTechId', 'assignedTechName',
+            'assignedTechUid', 'assignedTechIds', 'assignedTechNames', 'assignedTechUids',
+            'assignedByUid', 'assignedAtMs', 'respondedAtMs', 'resolvedAtMs',
+            'responseMinutes', 'resolutionMinutes', 'holdReason', 'rootCause',
+            'resolutionNotes', 'slaResponseTargetMinutes', 'slaResolutionTargetMinutes',
+            'updatedAt'
+          ])) ||
+          // Action B: Assigned Technician updating progress, On Hold, or Selesai (blocked once Selesai)
+          (isAssignedTechOnTicket(existing()) &&
+           existing().status != 'Selesai' &&
+           incoming().status in ['Ditugaskan', 'Ditangani', 'On Hold', 'Selesai'] &&
+           incoming().diff(existing()).affectedKeys().hasOnly([
+             'status', 'respondedAtMs', 'resolvedAtMs', 'responseMinutes',
+             'resolutionMinutes', 'holdReason', 'rootCause', 'resolutionNotes', 'updatedAt'
+           ])) ||
+          // Action C: Reporter editing details while ticket is still Baru
+          (existing().reporterUid == request.auth.uid &&
+           existing().status == 'Baru' &&
+           incoming().diff(existing()).affectedKeys().hasOnly([
+             'title', 'description', 'skpdPicName', 'skpdContact', 'updatedAt'
+           ]))
+        );
+      allow delete: if isAdmin() && isValidId(ticketId);
+
+      // 6. Ticket Audit Logs (Master Gate Subcollection)
+      match /logs/{logId} {
+        function parentTicket() {
+          return get(/databases/$(database)/documents/tickets/$(ticketId));
+        }
+
+        allow get: if isSignedInVerified() && isValidId(ticketId) && isValidId(logId) && (
+          isStaff() ||
+          parentTicket().data.reporterUid == request.auth.uid ||
+          isAssignedTechOnTicket(parentTicket().data)
+        );
+        allow list: if isSignedInVerified() && isValidId(ticketId) && (
+          isBootstrappedAdmin() ||
+          resource.data.actorUid == request.auth.uid ||
+          (resource.data.action is string && isStaff())
+        );
+        allow create: if isSignedInVerified() && isValidId(ticketId) && isValidId(logId) &&
+          isValidTicketLog(incoming()) &&
+          exists(/databases/$(database)/documents/tickets/$(ticketId)) &&
+          (isStaff() ||
+           parentTicket().data.reporterUid == request.auth.uid ||
+           isAssignedTechOnTicket(parentTicket().data)) &&
+          incoming().actorUid == request.auth.uid &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+  }
+}

@@ -1,0 +1,395 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil pengguna terdaftar (Kepala Seksi, Teknisi Kominfo, atau Pelapor SKPD)",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["kepala_seksi", "teknisi", "pelapor_skpd"]
+        },
+        "unitSkpd": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "role", "unitSkpd", "createdAt", "updatedAt"]
+    },
+    "AdminGrant": {
+      "title": "AdminGrant",
+      "description": "Daftar otoritas Kepala Seksi yang memiliki akses penuh manajemen tiket dan penugasan",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 120
+        },
+        "grantedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "StaffGrant": {
+      "title": "StaffGrant",
+      "description": "Daftar pengguna internal Kominfo (Kepala Seksi / Teknisi) yang berhak memantau seluruh tiket",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["kepala_seksi", "teknisi"]
+        },
+        "grantedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "role", "grantedBy", "createdAt"]
+    },
+    "Technician": {
+      "title": "Technician",
+      "description": "Data pegawai/teknisi Seksi Infrastruktur & Jaringan Diskominfo",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "nip": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 35
+        },
+        "jabatan": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "spesialisasi": {
+          "type": "string",
+          "enum": [
+            "Jaringan & Fiber Optik",
+            "Server & Data Center",
+            "Keamanan & Firewall",
+            "Wireless & Akses Publik"
+          ]
+        },
+        "statusAktif": {
+          "type": "string",
+          "enum": ["aktif", "lapangan", "cuti"]
+        },
+        "linkedUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "nip",
+        "jabatan",
+        "spesialisasi",
+        "statusAktif",
+        "linkedUid",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Tiket pelaporan gangguan jaringan dan server SKPD dengan dukungan multi-teknisi dan status On Hold",
+      "type": "object",
+      "properties": {
+        "ticketNumber": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 24,
+          "pattern": "^TIK-[0-9]{4}-[0-9]{4}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 2000
+        },
+        "skpdName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "skpdPicName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "skpdContact": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 60
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Jaringan LAN/WAN",
+            "Server & Hosting",
+            "Internet & Bandwidth",
+            "VPN & Interkoneksi",
+            "Keamanan Jaringan",
+            "Perangkat Router/Switch"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["Kritis", "Tinggi", "Sedang", "Rendah"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Baru", "Ditugaskan", "Ditangani", "On Hold", "Selesai"]
+        },
+        "reporterUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedTechId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assignedTechName": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "assignedTechUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assignedTechIds": {
+          "type": "array"
+        },
+        "assignedTechNames": {
+          "type": "array"
+        },
+        "assignedTechUids": {
+          "type": "array"
+        },
+        "assignedByUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "holdReason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "rootCause": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "resolutionNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "slaResponseTargetMinutes": {
+          "type": "number"
+        },
+        "slaResolutionTargetMinutes": {
+          "type": "number"
+        },
+        "reportedAtMs": {
+          "type": "number"
+        },
+        "assignedAtMs": {
+          "type": "number"
+        },
+        "respondedAtMs": {
+          "type": "number"
+        },
+        "resolvedAtMs": {
+          "type": "number"
+        },
+        "responseMinutes": {
+          "type": "number"
+        },
+        "resolutionMinutes": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ticketNumber",
+        "title",
+        "description",
+        "skpdName",
+        "skpdPicName",
+        "skpdContact",
+        "category",
+        "priority",
+        "status",
+        "reporterUid",
+        "assignedTechId",
+        "assignedTechName",
+        "assignedTechUid",
+        "assignedTechIds",
+        "assignedTechNames",
+        "assignedTechUids",
+        "assignedByUid",
+        "holdReason",
+        "rootCause",
+        "resolutionNotes",
+        "slaResponseTargetMinutes",
+        "slaResolutionTargetMinutes",
+        "reportedAtMs",
+        "assignedAtMs",
+        "respondedAtMs",
+        "resolvedAtMs",
+        "responseMinutes",
+        "resolutionMinutes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TicketLog": {
+      "title": "TicketLog",
+      "description": "Riwayat kronologis penanganan, penugasan, dan penyelesaian tiket",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "fromStatus": {
+          "type": "string",
+          "enum": ["", "Baru", "Ditugaskan", "Ditangani", "On Hold", "Selesai"]
+        },
+        "toStatus": {
+          "type": "string",
+          "enum": ["Baru", "Ditugaskan", "Ditangani", "On Hold", "Selesai"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["actorUid", "actorName", "action", "note", "fromStatus", "toStatus", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Profil pengguna terotentikasi (menyimpan peran dan unit SKPD)"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminGrant" },
+      "description": "Daftar pengguna dengan hak akses Kepala Seksi"
+    },
+    "/staff_grants/{uid}": {
+      "schema": { "$ref": "#/entities/StaffGrant" },
+      "description": "Daftar otoritas staf Kominfo (Teknisi dan Kepala Seksi) untuk akses daftar tiket"
+    },
+    "/technicians/{techId}": {
+      "schema": { "$ref": "#/entities/Technician" },
+      "description": "Direktori pegawai/teknisi Diskominfo Seksi Infrastruktur & Jaringan"
+    },
+    "/tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/Ticket" },
+      "description": "Tiket pelaporan gangguan jaringan & server dari SKPD"
+    },
+    "/tickets/{ticketId}/logs/{logId}": {
+      "schema": { "$ref": "#/entities/TicketLog" },
+      "description": "Subkoleksi log kronologis respon dan penyelesaian tiket"
+    }
+  }
+}

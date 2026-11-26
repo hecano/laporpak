@@ -1,0 +1,8 @@
+{
+  "name": "SI-TIKET Jaringan — Diskominfo",
+  "description": "Sistem Pelaporan Gangguan Jaringan & Server berbasis Ticketing, Monitoring SLA, Penugasan Teknisi, dan Ekspor Laporan Bulanan/Triwulanan Seksi Infrastruktur & Jaringan Diskominfo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
